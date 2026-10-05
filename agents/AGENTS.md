@@ -21,3 +21,7 @@
 - Default to action; only ask when a decision is truly blocking.
 - If details are missing, pick a reasonable default and state the assumption.
 - Keep work moving with small, incremental steps and quick checks.
+
+## Corrections
+- Repeated mistake corrected: fix the instance, then remove its cause at the highest level that works: (1) architecture or data structure that makes it impossible, (2) type, lint, or test that fails CI and names the fix, (3) skill or AGENTS rule, judgment calls only. Human review is not a fix.
+- Fix outside task scope: propose it with its level instead. Whole class of mistakes: use the `correct` skill.
