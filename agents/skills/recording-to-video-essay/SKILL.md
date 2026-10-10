@@ -1,6 +1,6 @@
 ---
 name: recording-to-video-essay
-description: Turn a raw talking-head recording or voiceover into a tight video essay with word-level timing, clean cuts, captions, and timed image overlays. Use when someone wants to edit a spoken recording, remove pauses and false starts, keep the speaker's words and order, add B-roll or screenshots, or use FFmpeg and Remotion to make a preview and final video.
+description: Edit a spoken recording into a concise video essay with captions and timed visual overlays.
 ---
 
 # Recording to Video Essay
