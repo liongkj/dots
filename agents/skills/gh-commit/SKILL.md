@@ -1,6 +1,6 @@
 ---
 name: gh-commit
-description: "Review git changes and split them into semantic commits with clear messages. Use when the user asks to commit work, clean up local history, or group a mixed diff into logical commits. Do not commit on main or master unless the user explicitly asks."
+description: Organize local Git changes into clear, semantic commits when the user asks to commit.
 ---
 
 # GH Commit
@@ -14,7 +14,7 @@ Turn the current working tree into a small set of clean commits without mixing u
 1. Verify git context.
 - Run `git rev-parse --show-toplevel` and `git status -sb`.
 - Read the branch with `git branch --show-current`.
-- If the branch is `main` or `master`, stop and ask the user to switch/create a branch (recommend `codex/...`) unless they explicitly asked to commit on that branch.
+- If on the default branch, create a task branch under the repository worktree rules unless the user explicitly asked to commit on that branch. Preserve the requested changes and unrelated state.
 
 2. Inspect all changes before staging anything.
 - Run `git diff --stat` and `git diff --cached --stat`.
@@ -43,7 +43,7 @@ Turn the current working tree into a small set of clean commits without mixing u
 
 ## Safety Rules
 
-- Avoid `git add -A` unless the entire remaining diff belongs in one commit.
+- Stage explicit paths or hunks. Never use `git add .` or `git add -A`.
 - Use partial staging when a file mixes multiple concerns.
 - Do not rewrite or discard user changes unless explicitly asked.
 - If grouping is ambiguous, ask before committing.

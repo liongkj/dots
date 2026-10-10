@@ -1,6 +1,6 @@
 ---
 name: simple-html-artifact
-description: Build or refine single-file information-first HTML artifacts, especially index.html or text.html pages, with strong information hierarchy, restrained styling, accessible semantics, and minimal AI-generated frontend tells. Use when creating static HTML reports, research pages, explainers, briefs, dashboards, note indexes, or simple front ends whose goal is comprehension rather than marketing conversion.
+description: Build or refine a single-file, information-first HTML report, explainer, dashboard, or brief.
 ---
 
 # Simple HTML Artifact

@@ -1,6 +1,6 @@
 ---
 name: "yeet"
-description: "Use only when the user explicitly asks to stage, commit, push, and open a GitHub pull request in one flow using the GitHub CLI (`gh`)."
+description: Stage, commit, push, and open a GitHub PR only when the user explicitly requests that flow.
 ---
 
 # Yeet
@@ -20,11 +20,11 @@ description: "Use only when the user explicitly asks to stage, commit, push, and
 
 - If on main/master/default, create a branch: `git checkout -b "codex/{description}"`
 - Otherwise stay on the current branch.
-- Confirm status, then stage everything: `git status -sb` then `git add -A`.
+- Inspect status and the diff. Stage only task files or hunks with explicit paths; preserve unrelated work.
 - Commit tersely with the description: `git commit -m "{description}"`
 - Run checks if not already. If checks fail due to missing deps/tools, install dependencies and rerun once.
 - Push with tracking: `git push -u origin $(git branch --show-current)`
-- If git push fails due to workflow auth errors, pull from master and retry the push.
+- If push fails, inspect the actual error. Authentication failures require authentication repair; do not pull or change the base branch to address them.
 - Open a PR and edit title/body to reflect the description and the deltas: `GH_PROMPT_DISABLED=1 GIT_TERMINAL_PROMPT=0 gh pr create --draft --fill --head $(git branch --show-current)`
-- Write the PR description to a temp file with real newlines (e.g. pr-body.md ... EOF) and run pr-body.md to avoid \\n-escaped markdown.
-- PR description (markdown) must be detailed prose covering the issue, the cause and effect on users, the root cause, the fix, and any tests or checks used to validate.
+- Write the PR body to a temporary file with real newlines and pass it with `gh pr edit --body-file <path>`. Treat the file as text, not a command.
+- Use the repository PR template. Explain the problem, resulting behavior, and validation. Scale detail to the change.

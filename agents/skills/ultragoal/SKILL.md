@@ -1,6 +1,6 @@
 ---
 name: ultragoal
-description: Design, critique, set, create, activate, or run durable Codex goals for persistent or long-running objectives. Use when the user says "set a goal", "start a goal", "activate goal mode", "persistent goal", "long-running objective", "goal tree", or asks for a goal with verifiers, durable state, approval gates, completion proof, bounded delegation, or parent/child subagent goals.
+description: Design or run durable Codex goals for persistent, long-running objectives.
 ---
 
 # Ultragoal
@@ -36,7 +36,7 @@ Ask only when the missing answer changes the finish line, grants consequential a
 
 Gather the smallest useful evidence set:
 
-k1. Read the canonical local source and its applicable instructions.
+1. Read the canonical local source and its applicable instructions.
 2. Inspect the current baseline, existing attempts, tests, benchmarks, reproductions, or acceptance criteria.
 3. Inventory the capabilities needed to exercise the real outcome, including terminal access, Browser, authenticated Chrome, Computer Use, local apps, devices, accounts, permissions, and test environments.
 4. Refresh volatile facts from primary or live sources when they determine the goal.
@@ -126,10 +126,6 @@ Treat user steering, new evidence, changed constraints, failed verification, and
 
 Do not let chat become the only source of current plan state. Do not create these files in Design mode unless the user asked for durable artifacts; include complete draft contents in the goal packet instead.
 
-### 6. Design delegation without losing ownership
-
-When subagents are authorized, the parent thread remains responsible for scope, integration, conflicts, and final completion. Delegate only cleanly separable lanes such as environment discovery, alternative approaches, source research, or independent verification.
-
 ### 6. Delegate Carefully
 
 When subagents are authorized, the parent keeps scope, integration, conflict resolution, and final completion. Delegate only separable lanes: environment discovery, source research, alternative approaches, or independent verification.
@@ -148,13 +144,6 @@ Before activation, red-team the draft:
 
 If activation was requested, or the Default Activation Rule applies, call `create_goal` only after the goal packet is grounded and red-teamed. This call is the final action of activation; do not call it early, and do not merely say a goal should be set.
 
-- Can success be faked by weakening or changing the verifier?
-- Could Codex satisfy the words while missing the user's real outcome?
-- Are irreversible, public, shared, or costly actions separately approval-gated?
-- Does the goal explain what to do after a failed attempt or external wait?
-- Is completion observable to someone other than the running agent?
-- If the outcome is interactive, does the goal actually exercise it with Browser, authenticated Chrome, or Computer Use on the correct surface?
-- Are all required verification capabilities available, or does the goal name the exact blocked handoff instead of weakening the verifier?
 
 Use a compact objective:
 

@@ -100,7 +100,7 @@ The installer supports selective installation with these flags:
 - `--openai`/`--codex` - Install only Codex configuration (OpenAI Developers)
 - `--cursor` - Install only Cursor commands (global)
 - `--cursor-project` - Install Cursor commands to .cursor/commands (project)
-- `--skills` - Install Codex skills to ~/.codex/skills
+- `--skills` - Link agent skills into ~/.agents/skills and ~/.claude/skills
 - `--prompt NAME` - Install only one prompt (repeatable)
 - `--only-prompts a,b,c` - Install only these prompts (comma-separated)
 - `--list-prompts` - List available prompts

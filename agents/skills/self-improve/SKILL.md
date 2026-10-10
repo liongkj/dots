@@ -1,6 +1,6 @@
 ---
 name: self-improve
-description: Codex-specific, session-driven self-improvement for Codex behavior and project instructions. Use when the user asks to inspect past Codex sessions, run a "dream" pass over prior interactions, mine repeated user corrections/preferences, improve or draft skills, update repo/project `AGENTS.md` guidance, or propose durable edits to global `~/.codex/AGENTS.md`.
+description: Improve Codex behavior or project instructions from evidence in prior sessions and feedback.
 ---
 
 # Self Improve
@@ -37,6 +37,8 @@ This skill depends on Codex's local session system (`~/.codex/state_5.sqlite` pl
    python3 scripts/self_improve.py skill-audit --limit 500 --days 365 --min-support 1 --min-confidence 0.6 --emit-patch
    ```
 
+   The script includes personal skill roots and the nearest `.agents/skills` root above the current directory. Add other project libraries with repeatable `--skill-root <path>` options.
+
 5. Read the proposal buckets and decide what to patch:
    - `Skills`: tighten existing `SKILL.md`, add scripts/references, or create a new skill.
    - `Project AGENTS.md`: update the nearest repo/vault instruction file for a project-specific preference.
@@ -48,6 +50,8 @@ This skill depends on Codex's local session system (`~/.codex/state_5.sqlite` pl
 
 - Treat `~/.codex/state_5.sqlite` as the authoritative session index.
 - Use each row's `threads.rollout_path` to load full rollout JSONL transcripts from `~/.codex/sessions/...` or `~/.codex/archived_sessions/...`.
+- Read direct user text from both legacy `event_msg.user_message` records and current `response_item.message` records. For current records, accept `user.text` and exclude injected skill, plugin, environment, and instruction items.
+- When ambient browser state, response annotations, referenced conversations, app context, or file context wraps a `## My request:` section, mine only that request. Do not treat wrapper instructions or quoted context as user preferences.
 - Treat `~/.codex/session_index.jsonl` as an incomplete convenience index, not the source of truth.
 - Use `~/.codex/memories/MEMORY.md` and `~/.codex/memories/memory_summary.md` as supporting context only. Do not write them by default.
 
@@ -59,8 +63,8 @@ This skill depends on Codex's local session system (`~/.codex/state_5.sqlite` pl
 - Treat `Support` as deduped thread clusters, not raw thread IDs, so same-day retries of one task do not inflate one proposal.
 - Use `Confidence` to suppress one-off task noise. If a proposal still reads like a transient implementation ask, inspect its cited sessions with `show` before patching.
 - Keep proposal buckets disjoint. If a preference belongs in a project `AGENTS.md`, do not also copy the same rule into global `~/.codex/AGENTS.md` unless it clearly applies across repos.
-- For project proposals, infer the nearest target `AGENTS.md` from the session `cwd`; prefer the closest existing `AGENTS.md`/`AGENTS.MD`, then repo root, then `cwd/AGENTS.md`.
-- For skill proposals, map edits to an existing skill folder under `~/.codex/skills` or `~/.agents/skills` when the transcript or cwd makes that unambiguous; otherwise propose a new skill path under `~/.codex/skills/<name>/SKILL.md`.
+- For project proposals, infer the nearest target `AGENTS.md` from the session `cwd`. Resolve deleted worktrees to a current repository with the same repository name when possible. Never propose a new instruction file inside a stale or deleted task directory.
+- For skill proposals, map edits to an existing skill folder under the configured skill roots when the transcript or cwd makes that unambiguous; otherwise propose a new skill path under `~/.codex/skills/<name>/SKILL.md`.
 - Use `skill-audit` when the question is “which existing skills should be improved?” because it suppresses suggestions already present in each target `SKILL.md` and emits only uncovered rules per skill.
 
 ### scripts/

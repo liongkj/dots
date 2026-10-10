@@ -1,6 +1,6 @@
 ---
 name: "gh-fix-ci"
-description: "Use when a user asks to debug or fix failing GitHub PR checks that run in GitHub Actions; use `oai_gh` or `gh` to inspect checks and logs, summarize failure context, draft a fix plan, and implement only after explicit approval. Treat external providers (for example Buildkite) as out of scope and report only the details URL."
+description: Diagnose or fix failing GitHub Actions checks on the current pull request.
 ---
 
 
@@ -8,8 +8,8 @@ description: "Use when a user asks to debug or fix failing GitHub PR checks that
 
 ## Overview
 
-Use `oai_gh` when available, otherwise `gh`, to locate failing PR checks, fetch GitHub Actions logs for actionable failures, summarize the failure snippet, then propose a fix plan and implement after explicit approval.
-- If a plan-oriented skill (for example `create-plan`) is available, use it; otherwise draft a concise plan inline and request approval before implementing.
+Use `oai_gh` when available, otherwise `gh`, to locate failing PR checks, fetch GitHub Actions logs for actionable failures, summarize the failure snippet, then implement a scoped fix when requested.
+- For diagnosis or plan-only requests, report the cause and proposed fix. For a fix request, proceed with reversible changes under existing authorization.
 
 Prereq: authenticate with the GitHub CLI once, then confirm auth with `oai_gh auth status` when available or `gh auth status` otherwise (repo + workflow scopes are typically required).
 
@@ -50,12 +50,12 @@ Prereq: authenticate with the GitHub CLI once, then confirm auth with `oai_gh au
 5. Summarize failures for the user.
    - Provide the failing check name, run URL (if any), and a concise log snippet.
    - Call out missing logs explicitly.
-6. Create a plan.
-   - Use the `create-plan` skill to draft a concise plan and request approval.
-7. Implement after approval.
-   - Apply the approved plan, summarize diffs/tests, and ask about opening a PR.
-8. Recheck status.
-   - After changes, suggest re-running the relevant tests and `gh pr checks` to confirm.
+6. Choose the smallest fix supported by the logs and source.
+   - Ask only when a product or architecture choice cannot be resolved from the request.
+7. Implement the requested fix.
+   - Preserve unrelated work. Publish or open a PR when the request authorizes it.
+8. Verify the changed behavior with relevant checks.
+   - Report checks run and any limits. Local success does not establish CI success; report CI separately when it has run on the changed commit.
 
 ## Bundled Resources
 

@@ -1,15 +1,14 @@
 # Skills Catalog
 
-Codex skills stored for installation to `~/.codex/skills` via `./install.sh --skills` or `./install.sh --agents`.
+Agent skills. `./install.sh --skills` links each one into `~/.agents/skills` (Codex) and `~/.claude/skills` (Claude Code), so edits here apply to both.
 
 Restart Codex after installing or updating skills so the frontmatter descriptions are reloaded.
 
 ## How To Use Skills
 
-- Name a skill directly, such as `$audit-ai-code`, `$tweet-like-me`, or `use the Playwright skill`.
+- Name a skill directly, such as `$audit-ai-code`, `$yeet`, or `use the Playwright skill`.
 - Ask naturally with phrases from the skill description. The `description` field is the main recall surface, so include real trigger words there.
 - Keep each skill narrow. Put detailed procedures in `SKILL.md`, and move long checklists or source material into `references/`.
-- For personal-voice skills, use the named person's corpus. Do not reuse Jason Liu's email or tweet style for someone else; build a separate skill from that person's own sent email, Slack, or social examples with permission.
 
 ## Review And Cleanup
 
@@ -44,18 +43,6 @@ Use for dictation-to-draft workflows, short pre-draft interviews, audience/messa
 Turn raw talking-head recordings and voiceovers into tight, captioned video essays with reviewable cuts and image overlays.
 
 Use for word-level transcript cleanup, pauses, false starts, repeated takes, FFmpeg edits, Remotion subtitles, B-roll, previews, and final exports.
-
-### `email-like-me`
-
-Draft, rewrite, critique, or learn from emails in Jason Liu's personal email voice.
-
-Use for replies, follow-ups, intros, escalations, logistics, vendor/admin notes, investor/founder coordination, assistant delegation, and updates to the Jason-specific persona model.
-
-### `tweet-like-me`
-
-Draft, rewrite, critique, or reply on X/Twitter in Jason Liu's `@jxnlco` voice.
-
-Use for tweets, replies, quote-tweets, Codex/product posts, feedback asks, launches, operator takes, and short social reactions.
 
 ## GitHub And Shipping
 
@@ -103,24 +90,10 @@ Use for persistent or long-running objectives with verifiers, durable state, app
 
 Create and manage simple heartbeat automations attached to the current Codex thread.
 
-Use when Jason invokes `$loop` or asks a thread to keep going, check again, follow up, retry, monitor, or resume on a recurring cadence.
+Use when the user invokes `$loop` or asks a thread to keep going, check again, follow up, retry, monitor, or resume on a recurring cadence.
 
 ### `self-improve`
 
 Inspect Codex session history and propose improvements to behavior, skills, project `AGENTS.md`, or global Codex instructions.
 
 Use for dream passes, repeated-correction mining, skill audits, and durable instruction proposals.
-
-### `slidev-presentation-kit`
-
-Create or edit Slidev presentations in Jason's presentations repo.
-
-Use for new decks, existing slide edits, Slidev conventions, polishing, animation work, and repo-specific presentation references.
-
-## Personal Ops
-
-### `file-organizer`
-
-Organize Downloads, Desktop, Documents, and Google Drive with safe plans.
-
-Use for cleanup plans, vague filename review, duplicate/delete candidates, approved moves/renames, Drive mirroring, and cleanup logs.

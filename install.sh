@@ -394,7 +394,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --openai/--codex  Install only Codex configuration (OpenAI Developers)"
             echo "  --cursor  Install only Cursor commands (global)"
             echo "  --cursor-project  Install Cursor commands to .cursor/commands (project)"
-            echo "  --skills  Install Codex skills to ~/.codex/skills"
+            echo "  --skills  Link agent skills into ~/.agents/skills and ~/.claude/skills"
             echo "  --prompt NAME  Install only one prompt (repeatable)"
             echo "  --only-prompts a,b,c  Install only these prompts"
             echo "  --list-prompts  List available prompts"
@@ -490,14 +490,32 @@ if [ "$INSTALL_OPENAI" = true ]; then
 fi
 
 if [ "$INSTALL_SKILLS" = true ]; then
-    echo "🧠 Installing Codex skills..."
-    mkdir -p ~/.codex/skills
+    echo "🧠 Linking agent skills..."
     if [ -d "agents/skills" ]; then
-        install_cp_dir_contents agents/skills ~/.codex/skills
+        for skill_dir in "$PWD"/agents/skills/*/; do
+            skill="$(basename "$skill_dir")"
+            # Codex reads ~/.agents/skills; Claude Code reads ~/.claude/skills.
+            # loop drives Codex thread automations; Claude Code has a built-in /loop.
+            for dest in ~/.agents/skills ~/.claude/skills; do
+                if [ "$skill" = loop ] && [ "$dest" = ~/.claude/skills ]; then
+                    continue
+                fi
+                if [ -d "$dest/$skill" ] && [ ! -L "$dest/$skill" ]; then
+                    echo "Skipping $dest/$skill: a real directory exists; remove it to link."
+                    continue
+                fi
+                if [ "$DRY_RUN" = true ]; then
+                    echo "[dry-run] ln -sfn \"${skill_dir%/}\" \"$dest/$skill\""
+                else
+                    mkdir -p "$dest"
+                    ln -sfn "${skill_dir%/}" "$dest/$skill"
+                fi
+            done
+        done
     else
         echo "No skills found under agents/skills."
     fi
-    echo "✅ Codex skills installed"
+    echo "✅ Agent skills linked"
 fi
 
 if [ "$INSTALL_CURSOR" = true ]; then

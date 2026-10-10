@@ -18,38 +18,67 @@ from typing import Any, Iterable
 CODEX_HOME = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser()
 STATE_DB = CODEX_HOME / "state_5.sqlite"
 SKILLS_ROOT = CODEX_HOME / "skills"
-SKILL_ROOTS = (
+BASE_SKILL_ROOTS = (
     CODEX_HOME / "skills",
     Path.home() / ".agents" / "skills",
 )
 GLOBAL_AGENTS = CODEX_HOME / "AGENTS.md"
 REPO_SEARCH_ROOTS = (
+    Path.home() / "work",
     Path.home() / "dev",
     Path.home() / "code",
     Path.home() / "personal",
 )
 
-PREFERENCE_MARKERS = (
-    "make sure",
-    "default to",
-    "prefer",
-    "instead of",
-    "do not",
-    "don't",
-    "never",
-    "always",
-    "should be",
-    "should default",
-    "i want you to",
-    "i don't want",
-    "preserve",
-    "keep ",
-    "lean on",
-    "continue",
-    "keep going",
-    "don't stop",
-    "come on",
-    "can't you just",
+
+def unique_paths(paths: Iterable[Path]) -> tuple[Path, ...]:
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        expanded = path.expanduser()
+        identity = expanded.resolve(strict=False)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(expanded)
+    return tuple(unique)
+
+
+def discover_project_skill_roots(cwd: Path | None = None) -> tuple[Path, ...]:
+    path = (cwd or Path.cwd()).expanduser()
+    home = Path.home()
+    roots: list[Path] = []
+    for candidate_dir in [path, *path.parents]:
+        candidate = candidate_dir / ".agents" / "skills"
+        if candidate.is_dir():
+            roots.append(candidate)
+            break
+        if candidate_dir in {home, CODEX_HOME}:
+            break
+    return tuple(roots)
+
+
+SKILL_ROOTS = unique_paths((*BASE_SKILL_ROOTS, *discover_project_skill_roots()))
+
+USER_REQUEST_MARKER = "## My request:"
+USER_WRAPPER_PREFIXES = (
+    "<in-app-browser-context",
+    "# Response annotations:",
+    "## Referenced ChatGPT conversation:",
+    "## Referenced chats with Codex:",
+    "# Applications mentioned by the user:",
+    "# Files mentioned by the user:",
+)
+AUTOMATED_THREAD_TITLE_PREFIXES = ("[BB workflow ",)
+
+PREFERENCE_CUE_RE = re.compile(
+    r"(?:^|\b(?:please|codex|you)\s+)"
+    r"(?:make sure|default to|prefer|do not|don't|never|always|preserve)\b|"
+    r"\bi\s+(?:want you to|want the|don't want|do not want|prefer)\b|"
+    r"\byou\s+(?:should|shouldn't|must|mustn't|need to|do not|don't|never|always)\b|"
+    r"^remember\s+(?:to\s+)?(?:not\s+)?|"
+    r"^(?:use|choose|write|run|open|stage|treat)\b.*\binstead of\b",
+    re.IGNORECASE,
 )
 
 SKIP_USER_MESSAGE_RE = re.compile(
@@ -308,50 +337,28 @@ def known_repo_roots() -> tuple[Path, ...]:
     if vault_root.exists():
         roots.append(vault_root)
 
+    def is_repo_candidate(path: Path) -> bool:
+        return any(
+            (path / marker).exists()
+            for marker in (".git", "AGENTS.md", "AGENTS.MD")
+        )
+
     for search_root in REPO_SEARCH_ROOTS:
         if not search_root.is_dir():
             continue
-        for child in search_root.iterdir():
-            if child.is_dir():
+        for child in sorted(search_root.iterdir()):
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            if is_repo_candidate(child):
                 roots.append(child)
-    return tuple(roots)
-
-
-def resolve_repo_root_name(repo_name: str, fallback: Path) -> Path:
-    candidates = known_repo_roots()
-    if not candidates:
-        return fallback
-
-    exact = next((candidate for candidate in candidates if candidate.name == repo_name), None)
-    if exact is not None:
-        return exact
-
-    best_candidate = fallback
-    best_score = 0.0
-    for candidate in candidates:
-        score = difflib.SequenceMatcher(None, repo_name, candidate.name).ratio()
-        if candidate.name.endswith(repo_name) or repo_name.endswith(candidate.name):
-            score += 0.15
-        repo_tokens = set(repo_name.split("-"))
-        candidate_tokens = set(candidate.name.split("-"))
-        if repo_tokens and candidate_tokens:
-            score += 0.10 * (len(repo_tokens & candidate_tokens) / len(repo_tokens | candidate_tokens))
-        if score > best_score:
-            best_score = score
-            best_candidate = candidate
-
-    if best_score >= 0.74:
-        return best_candidate
-
-    matches = difflib.get_close_matches(
-        repo_name,
-        [candidate.name for candidate in candidates],
-        n=1,
-        cutoff=0.74,
-    )
-    if matches:
-        return next(candidate for candidate in candidates if candidate.name == matches[0])
-    return fallback
+            for grandchild in sorted(child.iterdir()):
+                if (
+                    grandchild.is_dir()
+                    and not grandchild.name.startswith(".")
+                    and is_repo_candidate(grandchild)
+                ):
+                    roots.append(grandchild)
+    return unique_paths(roots)
 
 
 def fetch_threads(
@@ -493,20 +500,58 @@ def iter_rollout_events(path: Path) -> Iterable[dict[str, Any]]:
                 raise SystemExit(f"Bad JSON in {path}:{line_no}: {exc}") from exc
 
 
-def collect_user_messages(thread: ThreadRecord) -> list[str]:
+def rollout_path_for_thread(thread: ThreadRecord) -> Path | None:
     path = Path(thread.rollout_path)
-    if not path.exists():
+    if path.exists():
+        return path
+    return find_orphan_rollout(thread.thread_id)
+
+
+def normalize_user_message(message: str) -> str:
+    normalized = message.strip()
+    if USER_REQUEST_MARKER in normalized:
+        return normalized.rsplit(USER_REQUEST_MARKER, 1)[1].strip()
+    if normalized.startswith(USER_WRAPPER_PREFIXES):
+        return ""
+    return normalized
+
+
+def direct_response_user_message(payload: dict[str, Any]) -> str:
+    if payload.get("type") != "message" or payload.get("role") != "user":
+        return ""
+
+    metadata = payload.get("internal_chat_message_metadata_passthrough") or {}
+    content_kinds = metadata.get("content_item_kinds") or []
+    if content_kinds and "user.text" not in content_kinds:
+        return ""
+
+    message = normalize_user_message(extract_message_text(payload))
+    if not message or message.startswith("<skill>") or SKIP_USER_MESSAGE_RE.search(message):
+        return ""
+    return message
+
+
+def collect_user_messages(thread: ThreadRecord) -> list[str]:
+    if (thread.title or "").lstrip().startswith(AUTOMATED_THREAD_TITLE_PREFIXES):
+        return []
+
+    path = rollout_path_for_thread(thread)
+    if path is None:
         return []
 
     messages: list[str] = []
     for event in iter_rollout_events(path):
-        if event.get("type") != "event_msg":
-            continue
         payload = event.get("payload") or {}
-        if payload.get("type") != "user_message":
+        if event.get("type") == "response_item":
+            message = direct_response_user_message(payload)
+            if message:
+                messages.append(message)
             continue
-        message = (payload.get("message") or "").strip()
-        if message:
+
+        if event.get("type") != "event_msg" or payload.get("type") != "user_message":
+            continue
+        message = normalize_user_message(str(payload.get("message") or ""))
+        if message and not message.startswith("<skill>") and not SKIP_USER_MESSAGE_RE.search(message):
             messages.append(message)
     return messages
 
@@ -569,11 +614,9 @@ def cmd_list(args: argparse.Namespace) -> None:
 
 
 def render_transcript(thread: ThreadRecord, *, max_tool_chars: int, include_instructions: bool) -> None:
-    rollout_path = Path(thread.rollout_path)
-    if not rollout_path.exists():
-        fallback = find_orphan_rollout(thread.thread_id)
-        if fallback is not None:
-            rollout_path = fallback
+    rollout_path = rollout_path_for_thread(thread)
+    if rollout_path is None:
+        raise SystemExit(f"Missing rollout for {thread.thread_id}: {thread.rollout_path}")
 
     print(f"# {thread.title or thread.thread_id}")
     print()
@@ -588,6 +631,18 @@ def render_transcript(thread: ThreadRecord, *, max_tool_chars: int, include_inst
     print(f"- rollout_path: `{rollout_path}`")
     print()
 
+    rendered_messages: set[tuple[str, str]] = set()
+
+    def emit_message(role: str, heading: str, message: str) -> None:
+        key = (role, message)
+        if not message or key in rendered_messages:
+            return
+        rendered_messages.add(key)
+        print(f"## {heading}")
+        print()
+        print(message)
+        print()
+
     for event in iter_rollout_events(rollout_path):
         event_type = event.get("type")
         payload = event.get("payload") or {}
@@ -595,20 +650,14 @@ def render_transcript(thread: ThreadRecord, *, max_tool_chars: int, include_inst
         if event_type == "event_msg":
             payload_type = payload.get("type")
             if payload_type == "user_message":
-                message = (payload.get("message") or "").strip()
-                if message:
-                    print("## User")
-                    print()
-                    print(message)
-                    print()
+                message = normalize_user_message(str(payload.get("message") or ""))
+                if message and not SKIP_USER_MESSAGE_RE.search(message):
+                    emit_message("user", "User", message)
             elif payload_type == "agent_message":
                 message = (payload.get("message") or "").strip()
                 if message:
                     phase = payload.get("phase") or "assistant"
-                    print(f"## Assistant ({phase})")
-                    print()
-                    print(message)
-                    print()
+                    emit_message("assistant", f"Assistant ({phase})", message)
             elif payload_type == "task_started":
                 print("## Task Started")
                 print()
@@ -621,16 +670,15 @@ def render_transcript(thread: ThreadRecord, *, max_tool_chars: int, include_inst
             continue
 
         payload_type = payload.get("type")
-        if payload_type == "message" and include_instructions:
+        if payload_type == "message":
             role = payload.get("role") or "unknown"
-            if role not in {"developer", "system"}:
-                continue
-            text = extract_message_text(payload)
-            if text:
-                print(f"## {role.title()} Instructions")
-                print()
-                print(text)
-                print()
+            if role == "user":
+                emit_message("user", "User", direct_response_user_message(payload))
+            elif role == "assistant":
+                phase = payload.get("phase") or "assistant"
+                emit_message("assistant", f"Assistant ({phase})", extract_message_text(payload))
+            elif include_instructions and role in {"developer", "system"}:
+                emit_message(role, f"{role.title()} Instructions", extract_message_text(payload))
         elif payload_type == "function_call":
             name = payload.get("name") or "unknown_tool"
             args = payload.get("arguments") or ""
@@ -696,13 +744,15 @@ def looks_like_preference(sentence: str) -> bool:
         return True
     if "come on" in lowered or "can't you just" in lowered:
         return True
+    if lowered.startswith("continue from @thread:"):
+        return False
     if lowered.startswith(QUESTION_PREFIXES):
         return False
     if sentence.endswith("?") and "make sure" not in lowered and "default to" not in lowered and "prefer" not in lowered:
         return False
     if lowered.startswith("can you") and "make sure" not in lowered:
         return False
-    return any(marker in lowered for marker in PREFERENCE_MARKERS)
+    return bool(PREFERENCE_CUE_RE.search(sentence))
 
 
 def normalize_suggestion(sentence: str) -> str:
@@ -748,6 +798,19 @@ def normalize_suggestion(sentence: str) -> str:
     return suggestion
 
 
+def looks_like_quoted_reference(message: str) -> bool:
+    if len(message) < 1200:
+        return False
+    heading_count = len(re.findall(r"^#{1,6}\s", message, flags=re.MULTILINE))
+    link_count = len(re.findall(r"https?://", message))
+    return (
+        message.count("```") >= 2
+        or heading_count >= 2
+        or link_count >= 3
+        or message.count("\n") >= 40
+    )
+
+
 def known_skill_names() -> list[str]:
     names = []
     for root in SKILL_ROOTS:
@@ -763,47 +826,32 @@ def infer_project_agents_path(cwd: str) -> str:
     path = Path(cwd).expanduser()
     home = Path.home()
 
-    worktrees_root = CODEX_HOME / "worktrees"
-    try:
-        relative = path.relative_to(worktrees_root)
-    except ValueError:
-        relative = None
-    if relative and len(relative.parts) >= 2:
-        repo_name = relative.parts[1]
-        fallback_repo = worktrees_root / relative.parts[0] / repo_name
-        repo_root = resolve_repo_root_name(repo_name, fallback_repo)
-        for filename in ("AGENTS.md", "AGENTS.MD"):
-            candidate = repo_root / filename
-            if candidate.exists():
-                return str(candidate)
-        return str(repo_root / "AGENTS.md")
-
-    for search_root in (home / "dev", home / "code", home / "personal"):
-        try:
-            relative = path.relative_to(search_root)
-        except ValueError:
-            continue
-        if not relative.parts:
-            break
-        repo_root = resolve_repo_root_name(relative.parts[0], search_root / relative.parts[0])
-        for filename in ("AGENTS.md", "AGENTS.MD"):
-            candidate = repo_root / filename
-            if candidate.exists():
-                return str(candidate)
-        return str(repo_root / "AGENTS.md")
-
     for candidate_dir in [path, *path.parents]:
-        if candidate_dir == home:
+        if candidate_dir in {home, CODEX_HOME}:
             break
-        if candidate_dir == CODEX_HOME:
-            break
+        if not candidate_dir.exists():
+            continue
         for filename in ("AGENTS.md", "AGENTS.MD"):
             candidate = candidate_dir / filename
             if candidate.exists():
                 return str(candidate)
         if (candidate_dir / ".git").exists():
             return str(candidate_dir / "AGENTS.md")
-    return str(path / "AGENTS.md")
+
+    roots_by_name = {candidate.name: candidate for candidate in known_repo_roots()}
+    for part in reversed(path.parts):
+        repo_root = roots_by_name.get(part)
+        if repo_root is None:
+            continue
+        for filename in ("AGENTS.md", "AGENTS.MD"):
+            candidate = repo_root / filename
+            if candidate.exists():
+                return str(candidate)
+        return str(repo_root / "AGENTS.md")
+
+    if path.exists():
+        return str(path / "AGENTS.md")
+    return str(GLOBAL_AGENTS)
 
 
 def infer_skill_path(sentence: str, cwd: str, skills: list[str]) -> str:
@@ -866,6 +914,8 @@ def extract_preference_signals(thread: ThreadRecord) -> list[tuple[str, str]]:
         if not message:
             continue
         if len(message) > 5000:
+            continue
+        if looks_like_quoted_reference(message):
             continue
         if SKIP_USER_MESSAGE_RE.search(message):
             continue
@@ -949,6 +999,14 @@ def load_skill_records() -> tuple[SkillRecord, ...]:
                 )
             )
     return tuple(sorted(records, key=lambda record: record.name))
+
+
+def configure_skill_roots(extra_roots: Iterable[Path] = ()) -> None:
+    global SKILL_ROOTS
+    SKILL_ROOTS = unique_paths(
+        (*BASE_SKILL_ROOTS, *discover_project_skill_roots(), *extra_roots)
+    )
+    load_skill_records.cache_clear()
 
 
 def skill_matches_thread(skill: SkillRecord, thread: ThreadRecord, user_messages: list[str]) -> bool:
@@ -1178,6 +1236,7 @@ def emit_dream_report(
 
 
 def cmd_dream(args: argparse.Namespace) -> None:
+    configure_skill_roots(args.skill_root)
     rows = fetch_threads(
         STATE_DB,
         limit=args.limit,
@@ -1204,6 +1263,7 @@ def cmd_dream(args: argparse.Namespace) -> None:
 
 
 def cmd_skill_audit(args: argparse.Namespace) -> None:
+    configure_skill_roots(args.skill_root)
     rows = fetch_threads(
         STATE_DB,
         limit=args.limit,
@@ -1268,6 +1328,13 @@ def build_parser() -> argparse.ArgumentParser:
     dream_parser.add_argument("--archived", choices=("active", "archived", "all"), default="all")
     dream_parser.add_argument("--cwd")
     dream_parser.add_argument("--query")
+    dream_parser.add_argument(
+        "--skill-root",
+        action="append",
+        type=Path,
+        default=[],
+        help="Additional skill root containing <skill>/SKILL.md; repeat as needed.",
+    )
     dream_parser.add_argument("--min-support", type=int, default=1)
     dream_parser.add_argument("--min-confidence", type=float, default=0.5)
     dream_parser.add_argument("--max-per-bucket", type=int, default=25)
@@ -1283,6 +1350,13 @@ def build_parser() -> argparse.ArgumentParser:
     skill_audit_parser.add_argument("--days", type=int, default=365)
     skill_audit_parser.add_argument("--archived", choices=("active", "archived", "all"), default="all")
     skill_audit_parser.add_argument("--query")
+    skill_audit_parser.add_argument(
+        "--skill-root",
+        action="append",
+        type=Path,
+        default=[],
+        help="Additional skill root containing <skill>/SKILL.md; repeat as needed.",
+    )
     skill_audit_parser.add_argument("--min-support", type=int, default=1)
     skill_audit_parser.add_argument("--min-confidence", type=float, default=0.6)
     skill_audit_parser.add_argument("--max-per-skill", type=int, default=8)

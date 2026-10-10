@@ -1,6 +1,6 @@
 ---
 name: transcript-to-blog
-description: Turn a spoken transcript, voice note, interview, or meeting note into a clear blog post or essay that keeps the speaker's words and voice. Use when someone wants to draft from dictation, avoid generic AI writing, shape a post for an audience, or check its title, hook, message, proof, and call to action.
+description: Turn spoken material into a clear blog post or essay that preserves the speaker's voice.
 ---
 
 # Transcript to Blog
