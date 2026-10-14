@@ -13,7 +13,9 @@ For an issue link, read the organization and numeric issue ID from the URL, then
 sentry issue view <org>/<issue-id> --fresh --json --fields id,shortId,title,status,priority,culprit,count,firstSeen,lastSeen,project
 ```
 
-Discover additional commands with `sentry <command> --help`. Issue detail can include the latest event; request only the event fields needed for the investigation. The full request entry can contain live session data. Do not print raw event payloads, credentials, emails, or IP addresses.
+Discover additional commands with `sentry <command> --help`. Issue detail can include the latest event. Select scalar evidence fields, for example `event.dateCreated,event.occurrence.evidenceData.numRepeatingSpans` for a captured N+1 query.
+
+Do not select whole `event.tags`, `event.entries`, or request objects for display. Tags can contain user IPs and request parameters. If a task needs a value inside an array, capture JSON in a process and filter it before printing. Do not print raw event payloads, credentials, emails, or IP addresses.
 
 If a request fails authentication, check the existing CLI session before asking the user to configure anything:
 
