@@ -50,6 +50,13 @@ Installs:
 Optional (project-local):
 - `.cursor/commands/*.md` (copied from `agents/prompts/`)
 
+### pstack for OpenCode
+
+`agents/scripts/install-pstack-opencode.sh` installs or updates [pstack](https://github.com/cursor/plugins/tree/main/pstack) for OpenCode. Run it again to update. It installs:
+- `~/.local/share/cursor-plugins` (sparse clone of `cursor/plugins`, `pstack/` only)
+- `~/.config/opencode/skills/*` (links to pstack skills; a name already in `~/.agents/skills` is skipped, because OpenCode drops a name found in both)
+- `~/.config/opencode/agents/*.md` (pstack agents converted to OpenCode subagents)
+
 ---
 
 ## Common Install Recipes
